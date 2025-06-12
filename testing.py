@@ -1,6 +1,8 @@
 import pyvisa
 import time
 
+#bro
+
 # Initialize VISA connection
 rm = pyvisa.ResourceManager()
 scope = rm.open_resource("TCPIP0::169.254.5.104::INSTR")  # Update if needed
