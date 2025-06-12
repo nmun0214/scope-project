@@ -8,6 +8,8 @@ from PyQt5.QtWidgets import (
 )
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
+## testing git 
+
 class TekScopeGUI(QWidget):
     def __init__(self):
         super().__init__()
