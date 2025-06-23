@@ -1,7 +1,6 @@
 import pyvisa
 import time
 
-#bro
 
 # Initialize VISA connection
 rm = pyvisa.ResourceManager()

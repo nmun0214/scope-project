@@ -8,15 +8,45 @@ class GWInstekPSW:
         self.sock = None
 
     def connect(self):
+        
+        """
+        Opens a TCP socket to the power supply and sends an *IDN? query to confirm connection
+
+        Returns: 
+            str: Device's identity string returned by the identification query
+
+        """
+
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.settimeout(self.timeout)
         self.sock.connect((self.ip, self.port))
         print("Connected to power supply:", self.query("*IDN?"))
 
     def send(self, command):
+
+        """ 
+        Send raw SCPI commands over socket
+
+        Parameters: 
+            command (str): the SCPI command 
+
+        Ex: self.send("VOLT 5") 
+        sets voltage to 5V 
+        """
         self.sock.sendall((command + '\n').encode())
 
     def query(self, command):
+        
+        """
+        Sends a SCPI command and waits for a response
+
+        Parameters:
+            command (str): SCPI command
+        
+        Ex: self.query("MEAS:VOLT?")
+        returns measured voltage
+        """
+
         self.send(command)
         return self.sock.recv(1024).decode().strip()
 
@@ -45,7 +75,7 @@ class GWInstekPSW:
     def close(self):
         if self.sock:
             self.sock.close()
-            print("Disconnected")
+            print("PSU Disconnected")
 
 
 if __name__ == "__main__":
