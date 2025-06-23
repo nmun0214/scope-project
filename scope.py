@@ -80,7 +80,7 @@ class TekMSO64:
             mode {str} -- select mode, 
                 ("AUTO") will trigger when condition is met, but if it doesn't see condition within timeout it'll trigger anyway. 
                 ("NORMAL") always waits until the trigger is satisfied
-                default "NORMAL"
+                default is "NORMAL"
 
         """        
         self.send(f"TRIG:MODE {mode}")
@@ -91,11 +91,11 @@ class TekMSO64:
     def start_acquisition(self, mode="HIRES"):
         """Begins acquisition with an optional acquisition mode
 
-        Keyword Arguments:
+        Arguments:
             mode {str} -- can choose between "HIRES" "SAMPLE" and "PEAKDETECT" (default: {"HIRES"})
                 "HIRES" -- uses oversampling and averaging to reduce noise, improve vertical res
                 "SAMPLE" -- stores raw samples from ADC
-                "PEAKDETECT" --  
+                "PEAKDETECT" --  stores the minimum and maximum voltage values seen, good for spotting quick transients 
         """        
         self.send(f"ACQUIRE:MODE {mode}")
         self.send("ACQUIRE:STATE ON")
@@ -110,6 +110,17 @@ class TekMSO64:
         print("Trigger detected.")
 
     def fetch_waveform(self, channel="CH1", start=1, stop=1000):
+        """Gets the waveform data from the selected channel and converts it to real voltages, outputs as NumPy array
+
+        Keyword Arguments:
+            channel {str} select the channel to read waveform from (default: {"CH1"})
+            start {int} -- defines from which point the output waveform should start (default: {1})
+            stop {int} -- defines from which point the output waveform should end (default: {1000})
+                essentially, the default allows you to return data from the first point to the 1000th point
+
+        Returns:
+            data {numpy.ndarray} -- numpy array of the recorded voltages
+        """        
         self.send(f"DATA:SOURCE {channel}")
         self.send("DATA:ENC ASCII")
         self.send("DATA:WIDTH 1")
