@@ -84,7 +84,7 @@ if __name__ == "__main__":
     try:
         psu.connect()
         psu.set_voltage(5.0)       # Set output voltage
-        psu.set_current(2.0)       # Set current limit
+        psu.set_current(0.2)       # Set current limit
         psu.output_on()            # Enable output
 
         # Optional: Read measurements
@@ -93,7 +93,7 @@ if __name__ == "__main__":
         print(f"Measured Voltage: {v:.2f} V")
         print(f"Measured Current: {i:.2f} A")
 
-        # psu.output_off()  # Uncomment to turn off after test
+        psu.output_off() 
 
     finally:
         psu.close()

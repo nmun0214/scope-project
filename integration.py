@@ -2,9 +2,10 @@ from power import GWInstekPSW
 from scope import TekMSO64
 import matplotlib.pyplot as plt
 
-''' 
-THIS IS UN-TESTED GPT CODE
-'''
+
+## WARNING ##
+# UNTESTED GPT CODE
+
 # --- Initialize instruments ---
 psu = GWInstekPSW(ip="169.254.5.130", port=2268)
 scope = TekMSO64(ip="169.254.5.104")
@@ -16,7 +17,7 @@ try:
 
     # --- Power supply configuration ---
     psu.set_voltage(5.0)
-    psu.set_current(1.0)
+    psu.set_current(0.5)
     psu.output_on()
 
     # --- Scope configuration ---

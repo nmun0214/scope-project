@@ -13,7 +13,6 @@ class TekMSO64:
         """
         Connect to scope using pyVISA using the given IP from init, prints the corresponding *IDN? string
         """
-
         rm = pyvisa.ResourceManager()
         self.scope = rm.open_resource(f"TCPIP0::{self.ip}::INSTR")
         self.scope.timeout = self.timeout
@@ -36,6 +35,7 @@ class TekMSO64:
         Returns:
             output {str} -- scope query output
         """        
+        
         return self.scope.query(command).strip()
 
     def reset(self):
@@ -61,7 +61,7 @@ class TekMSO64:
     def configure_timebase(self, scale=0.001, record_length=1000):
         """Set the horizontal axis and acqusition length
 
-        Keyword Arguments:
+        Arguments:
             scale {float} -- _description_ (default: {0.001})
             record_length {int} -- _description_ (default: {1000})
         """        
@@ -89,12 +89,12 @@ class TekMSO64:
         self.send(f"TRIG:EDGE:LEVEL {level}")
 
     def start_acquisition(self, mode="HIRES"):
-        """Begins acquisition with an optional acquisition mode
+        """Begins data acquisition, optically you can choose your acquisition mode (read below)
 
         Arguments:
             mode {str} -- can choose between "HIRES" "SAMPLE" and "PEAKDETECT" (default: {"HIRES"})
                 "HIRES" -- uses oversampling and averaging to reduce noise, improve vertical res
-                "SAMPLE" -- stores raw samples from ADC
+                "SAMPLE" -- stores RAW samples from ADC
                 "PEAKDETECT" --  stores the minimum and maximum voltage values seen, good for spotting quick transients 
         """        
         self.send(f"ACQUIRE:MODE {mode}")

@@ -6,6 +6,8 @@ import struct
 import serial
 import crcmod
 
+# WORK IN PROGRESS, UNTESTED CODE
+
 # CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF)
 crc16 = crcmod.mkCrcFun(0x11021, initCrc=0xFFFF, rev=False)
 
@@ -34,6 +36,8 @@ class EDFACommand:
         self.ser.write(frame)
         response = self.ser.read(64)  # or expected response length
         return response
+
+    # TEST FUNCTIONS, REFER TO CIENA EDFA MANUAL
 
     def get_pump_laser_status(self, amp_index: int, laser_index: int):
         # Command 0x3A: Get Pump Laser Status
