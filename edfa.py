@@ -71,18 +71,6 @@ class EDFACommand:
         return response
 
     def send_gui_raw_command(self, cmd_type: str, amp_index: int, stage_index: int, expected_response_size: int = None) -> bytes:
-        """
-        Sends a raw command for a given command type (e.g., 'get_mode', 'get_module_status', 'get_pump_laser_status')
-        using a lookup table of known-good raw hex commands from the GUI.
-        Args:
-            cmd_type: One of 'get_mode', 'get_module_status', 'get_pump_laser_status'
-            amp_index: Amplifier index (int)
-            stage_index: Stage index (int)
-            expected_response_size: Optional, number of bytes to read
-        Returns:
-            Raw response bytes
-        """
-        # Lookup table for known-good raw commands (add more as needed)
         gui_commands = {
             ('get_mode', 1, 1): '6800056831005f01019216',
             ('get_module_status', 1, 1): '6800056830006001019216',
@@ -91,15 +79,17 @@ class EDFACommand:
             ('get_module_status', 0, 2): '680005683000710002a316',
             ('get_module_status', 1, 2): '680005683000720102a516',
             ('get_module_status', 2, 2): '680005683000730202a716',
-            # Add more as needed, e.g. ('get_pump_laser_status', 1, 1): '...'
+            ('get_pump_laser_status', 1, 1): '680005683a00a10101dd16',
+            ('get_pump_laser_status', 1, 2): '680005683a00a20102df16',
+            ('get_pump_laser_status', 1, 3): '680005683a00a30103e116',
+            ('get_pump_laser_status', 1, 4): '680005683a009c0104db16',
+            ('get_pump_laser_status', 1, 5): '680005683a009d0105dd16',
+            ('get_pump_laser_status', 1, 6): '680005683a009e0106df16',
+            ('get_alarm_status', 1, 0): '680004684000a701e816',
+            ('get_alarm_status', 0, 0): '680004684000a900e916',
+            ('get_voa_mode', 0, 0): '680004686200ab000d16',
+            ('get_voa_mode', 1, 0): '680004686200ac010f16',
         }
-        # For 'get_module_status' response:
-        #   Response size: 8 bits (bitmap) if Argument 1 > 0, 8 bits * TotalAMPs if Argument 1 = 0
-        #   Bit 0: Amp is disabled
-        #   Bit 1: Amp is in APR (eye-safe mode)
-        #   Bit 2: Amp is gain-limited
-        #   Bit 3: Amp is power clamping
-        #   Bits 4-7: Reserved
         key = (cmd_type, amp_index, stage_index)
         if key not in gui_commands:
             raise ValueError(f"No raw command found for {cmd_type} amp={amp_index} stage={stage_index}")
@@ -107,19 +97,13 @@ class EDFACommand:
         return self.send_raw_command(hexstr, expected_response_size)
 
     def parse_pump_laser_status_response(self, response: bytes):
-        """
-        Parses the pump laser status response and prints values in human-readable format.
-        Expects a response of at least 33 bytes (including header and CRC).
-        """
         if len(response) < 33:
-            print("Response too short to parse.")
+            print(f"Pump Laser Status: Response too short to parse. Raw: {response.hex().upper()}")
             return
-        # Data starts at byte 7 (index 6), ends at byte 31 (index 30), CRC is last 2 bytes
-        data = response[7:-2]  # Exclude header and CRC
+        data = response[7:-2]
         if len(data) < 24:
             print("Not enough data for all fields.")
             return
-        # Unpack 8 shorts, 1 unsigned int, 2 shorts (24 bytes)
         fields = struct.unpack('>hhhhhhhhIhh', data)
         print("--- Pump Laser Status ---")
         print(f"1. Laser current: {fields[0]/10:.2f} mA")
@@ -136,10 +120,6 @@ class EDFACommand:
         print("-------------------------")
 
     def parse_mode_status_response(self, response: bytes):
-        """
-        Parses the mode status response for command 0x31 (Get Mode).
-        Handles both 2-byte and 4-byte data responses.
-        """
         if len(response) < 12:
             print("Response too short to parse.")
             return
@@ -156,16 +136,9 @@ class EDFACommand:
         print("-----------------------------")
 
     def parse_module_status_response(self, response: bytes):
-        """
-        Parses the module status response for command 0x30 (Get Module Status).
-        Expects a response of at least 10 bytes (including header and CRC).
-        """
         if len(response) < 10:
             print("Response too short to parse.")
             return
-        # Data starts at byte 7 (index 6), ends at byte 7 (index 7), CRC is last 2 bytes
-        # Example: 68 00 04 68 30 04 5d 01 92 16
-        # Data = response[7:-2] = 5d
         data = response[7:-2]
         if len(data) < 1:
             print("Not enough data for all fields.")
@@ -181,10 +154,6 @@ class EDFACommand:
         print("----------------------")
 
     def parse_power_response(self, response: bytes, label: str = "Power"):
-        """
-        Parses a power response (input/output/signal) for commands 0x35, 0x36, 0x37.
-        Handles both single and multi-amp responses.
-        """
         if len(response) < 12:
             print(f"{label}: Response too short to parse.")
             return
@@ -192,12 +161,82 @@ class EDFACommand:
         if len(data) < 2:
             print(f"{label}: Not enough data for all fields.")
             return
-        # Each 2 bytes is a signed 16-bit value, Input/Output/Signal Power * 100 (dBm)
         n = len(data) // 2
         print(f"--- {label} ---")
         for i in range(n):
             val = struct.unpack('>h', data[2*i:2*i+2])[0]
             print(f"{i+1}/{n} queried {label}: {val/100:.2f} dBm")
+        print("-------------------")
+
+    def parse_alarm_status_response(self, response: bytes):
+        """
+        Parses the alarm status response for command 0x40 (Get Alarm Status).
+        Prints current and latched alarms with bitfield decoding, per amplifier if multiple present.
+        """
+        if len(response) < 18:
+            print(f"Alarm Status: Response too short to parse. Raw: {response.hex().upper()}")
+            return
+        data = response[7:-2]
+        if len(data) < 8:
+            print("Alarm Status: Not enough data for all fields.")
+            return
+        alarm_names = [
+            'Gain Stage 1 Loss of Signal (LOS-1)', 'Heater Temperature (HT)', 'Gain Stage 1 Loss of Power (LOP-1)',
+            'Laser over-current alarm (ILD)', 'Laser temperature alarm (TMP)', 'Module Low Temperature alarm (MTL)',
+            'Module High Temperature alarm (MTH)', 'Gain Stage 2 Loss of Signal alarm (LOS-2)',
+            'Gain Stage 2 Loss of Power alarm (LOP-2)', 'Shutoff alarm (SHUTOFF)', 'ORL alarm (ORL)',
+            'APR alarm (APR)', 'TEC current alarm (TEC)', 'Laser Source alarm (SLD)', 'Out-Of-Gain (OOG)',
+            'Variable Optical Attenuator (VOA)', 'Input Optical Overload (IOO)', 'External HW disable (DIS)',
+            'L-Band Input Loss of Signal (LOS-L)', 'Mid stage loss (MLOSS)', 'Fiber LoopGain 1 alarm (FLG1)',
+            'Fiber LoopGain 2 alarm (FLG2)'
+        ]
+        n_amps = len(data) // 8
+        if n_amps == 0:
+            print("Alarm Status: No amplifier alarm data found.")
+            return
+        for amp in range(n_amps):
+            base = amp * 8
+            current = int.from_bytes(data[base:base+4], 'big')
+            latched = int.from_bytes(data[base+4:base+8], 'big')
+            print(f"The {amp+1}/{n_amps} queried amplifier alarm:")
+            any_alarm = False
+            for i, name in enumerate(alarm_names):
+                if current & (1 << (31 - i)):
+                    print(f"  {name};")
+                    any_alarm = True
+            if not any_alarm:
+                print("  (No active alarms)")
+            print(f"The {amp+1}/{n_amps} queried amplifier latched alarm:")
+            any_latched = False
+            for i, name in enumerate(alarm_names):
+                if latched & (1 << (31 - i)):
+                    print(f"  {name};")
+                    any_latched = True
+            if not any_latched:
+                print("  (No latched alarms)")
+        print("-------------------------------")
+
+    def parse_voa_mode_response(self, response: bytes):
+        if len(response) < 12:
+            print("VOA Mode: Response too short to parse.")
+            return
+        data = response[7:-2]
+        if len(data) < 3:
+            print("VOA Mode: Not enough data for all fields.")
+            return
+        n = len(data) // 3
+        voa_mode_map = {
+            1: 'Disable (Opaque)',
+            2: 'Constant attenuation',
+            3: 'Constant output power',
+            4: 'Fast attenuation',
+        }
+        for i in range(n):
+            voa_mode = data[3*i]
+            att = struct.unpack('>h', data[3*i+1:3*i+3])[0]
+            print(f"--- VOA {i+1} ---")
+            print(f"Mode: {voa_mode_map.get(voa_mode, f'Unknown ({voa_mode})')}")
+            print(f"Attenuation/Power: {att/100:.2f} dB or dBm (see mode)")
         print("-------------------")
 
     # TEST FUNCTIONS, REFER TO CIENA EDFA MANUAL
@@ -274,6 +313,38 @@ if __name__ == '__main__':
             print("\n--- Get Output Signal Power ---")
             signal_power_resp = edfa.send_raw_command('680005683700910001c916')
             edfa.parse_power_response(signal_power_resp, label="Signal Power")
+
+            # Demo: Get Pump Laser Status (using example sub_addr=0x50, amp_index=1, laser_index=1)
+            print("\n--- Get Pump Laser Status ---")
+            pump_resp = edfa.get_pump_laser_status(sub_addr=0x50, amp_index=1, laser_index=1)
+            edfa.parse_pump_laser_status_response(pump_resp)
+
+            # Demo: Get Pump Laser Status for all known-good (amp=1, laser=1-6)
+            print("\n--- Get Pump Laser Status (brute force, amp=1, lasers 1-6) ---")
+            for laser_index in range(1, 7):
+                print(f"\nPump Laser Status for amp=1, laser={laser_index}")
+                pump_resp = edfa.send_gui_raw_command('get_pump_laser_status', 1, laser_index)
+                edfa.parse_pump_laser_status_response(pump_resp)
+
+            # Demo: Get Alarm Status for amp=1 and all amps
+            print("\n--- Get Alarm Status (amp=1) ---")
+            alarm_resp_1 = edfa.send_gui_raw_command('get_alarm_status', 1, 0)
+            edfa.parse_alarm_status_response(alarm_resp_1)
+
+            print("\n--- Get Alarm Status (all amps) ---")
+            alarm_resp_all = edfa.send_gui_raw_command('get_alarm_status', 0, 0)
+            edfa.parse_alarm_status_response(alarm_resp_all)
+
+            # Demo: Get VOA Mode for all VOAs and VOA 1
+            print("\n--- Get VOA Mode (all VOAs) ---")
+            voa_resp_all = edfa.send_gui_raw_command('get_voa_mode', 0, 0)
+            edfa.parse_voa_mode_response(voa_resp_all)
+
+            print("\n--- Get VOA Mode (VOA 1) ---")
+            voa_resp_1 = edfa.send_gui_raw_command('get_voa_mode', 1, 0)
+            edfa.parse_voa_mode_response(voa_resp_1)
+
+            # TODO: Add more demo commands as you provide them!
 
         except Exception as e:
             print("Error:", e)
